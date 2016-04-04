@@ -5,6 +5,7 @@ matrix:
   include:
     # fully specify builds, include can't dynamically expand matrix entries
     # relative order of sudo and env is important so that addons: is recognized
+
     - os: linux
       dist: trusty
       sudo: required
@@ -16,9 +17,21 @@ matrix:
           packages:
           - gcc-4.9
           - g++-4.9
+
     - os: osx
       compiler: clang
       env: TARGET="osx"
+
+    - os: linux
+      sudo: false
+      env: TARGET="emscripten"
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
+          packages:
+          - libstdc++6
+
   # Exclude the default build that would otherwise be generated
   # see https://github.com/travis-ci/travis-ci/issues/1228
   exclude:
