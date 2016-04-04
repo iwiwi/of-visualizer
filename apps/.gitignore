@@ -17,3 +17,11 @@
 # don't ignore the .gitignore file
 !.gitignore
 
+# Visualizer
+!visualizer
+/visualizer/*/bin/*
+!/visualizer/*/bin/data/
+
+/visualizer/*/.cproject
+/visualizer/*/.project
+/visualizer/*/.settings/
