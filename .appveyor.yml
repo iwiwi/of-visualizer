@@ -9,11 +9,6 @@ clone_depth: 10
 environment:
   PATH: C:\Program Files (x86)\MSBuild\14.0\Bin;%PATH%
 build:
-  project: libs/openFrameworksCompiled/project/vs/openframeworksLib.vcxproj
+  project: apps/visualizer/emptyExample/emptyExample.vcxproj
   parallel: true
   verbosity: minimal
-test_script:
-- cmd: >-
-    cd scripts/ci/vs
-    
-    run_tests.bat
