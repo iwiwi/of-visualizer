@@ -16,5 +16,5 @@ cd libs/openFrameworksCompiled/project
 make Release
 
 echo "**** Building emptyExample ****"
-cd $ROOT/apps/vsualizer/emptyExample
+cd $ROOT/apps/visualizer/emptyExample
 make Release
