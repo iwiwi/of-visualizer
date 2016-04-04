@@ -13,15 +13,8 @@ cd $ROOT
 echo "PLATFORM_CFLAGS += $CUSTOMFLAGS" >> libs/openFrameworksCompiled/project/linux64/config.linux64.default.mk
 sed -i "s/PLATFORM_OPTIMIZATION_CFLAGS_DEBUG = .*/PLATFORM_OPTIMIZATION_CFLAGS_DEBUG = -g0/" libs/openFrameworksCompiled/project/makefileCommon/config.linux.common.mk
 cd libs/openFrameworksCompiled/project
-make Debug
+make Release
 
 echo "**** Building emptyExample ****"
-cd $ROOT/scripts/templates/linux64
-make Debug
-
-echo "**** Building allAddonsExample ****"
-cd $ROOT
-cp scripts/templates/linux64/Makefile examples/addons/allAddonsExample/
-cp scripts/templates/linux64/config.make examples/addons/allAddonsExample/
-cd examples/addons/allAddonsExample/
-make Debug
+cd $ROOT/apps/vsualizer/emptyExample
+make Release
