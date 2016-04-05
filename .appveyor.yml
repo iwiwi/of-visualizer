@@ -1,6 +1,6 @@
 version: 1.0.{build}
 os: Visual Studio 2015 RC
-configuration: Debug
+configuration: Release
 platform:
 - x86
 - x64
@@ -12,3 +12,5 @@ build:
   project: apps/visualizer/emptyExample/emptyExample.vcxproj
   parallel: true
   verbosity: minimal
+artifacts:
+  -path apps/visualizer/emptyExample/bin
