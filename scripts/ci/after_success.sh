@@ -5,7 +5,7 @@ ROOT=${TRAVIS_BUILD_DIR:-"$( cd "$(dirname "$0")/../../.." ; pwd -P )"}
 echo "**** Uploading to Dropbox ****"
 cd $ROOT/apps/visualizer/emptyExample
 
-$ARCHIVE_FILENAME=$TARGET.tar.gz
+ARCHIVE_FILENAME=$TARGET.tar.gz
 tar czvf $ARCHIVE_FILENAME bin
 
 curl --fail -X POST https://content.dropboxapi.com/2/files/upload \
