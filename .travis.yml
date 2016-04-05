@@ -49,7 +49,7 @@ script:
     - scripts/ci/$TARGET/build.sh $OPT
 
 after_success:
-    # this will only run fully on a commit, not a PR, due to secure above
-    if [ "$TARGET" == "docs" ]; then scripts/ci/$TARGET/after_success.sh; fi
+    - scripts/ci/after_success.sh
+
 git:
     depth: 10
