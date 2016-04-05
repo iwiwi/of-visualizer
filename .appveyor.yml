@@ -13,4 +13,4 @@ build:
   parallel: true
   verbosity: minimal
 artifacts:
-  -path apps/visualizer/emptyExample/bin
+- path: apps/visualizer/emptyExample/bin
