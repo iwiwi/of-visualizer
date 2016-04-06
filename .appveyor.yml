@@ -14,4 +14,5 @@ build:
 artifacts:
 - path: apps/visualizer/emptyExample/bin
 on_success:
+- 'dir apps\visualizer\emptyExample'
 - 'curl --fail -X POST https://content.dropboxapi.com/2/files/upload --header "Authorization: Bearer %DROPBOX_TOKEN%" --header "Dropbox-API-Arg: {\"path\": \"/%APPVEYOR_REPO_BRANCH%/windows_%PLATFORM%.zip\",\"mode\": \"add\",\"autorename\": false,\"mute\": false}" --header "Content-Type: application/octet-stream" --data-binary @apps\visualizer\emptyExample\bin.zip'
