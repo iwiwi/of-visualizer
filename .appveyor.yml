@@ -17,5 +17,5 @@ on_success:
 - '7z a bin.zip apps\visualizer\emptyExample\bin'
 - 'dir'
 - 'set PATH=C:\msys64\usr\bin;%PATH%'
-- 'curl --fail -X POST https://content.dropboxapi.com/2/files/upload --header "Authorization: Bearer %DROPBOX_TOKEN%" --header "Dropbox-API-Arg: {\"path\": \"/%APPVEYOR_REPO_BRANCH%/windows_%PLATFORM%.zip\",\"mode\": \"add\",\"autorename\": false,\"mute\": false}" --header "Content-Type: application/octet-stream" --data-binary @bin.zip'
+- 'C:\msys64\usr\bin\curl --fail -X POST https://content.dropboxapi.com/2/files/upload --header "Authorization: Bearer %DROPBOX_TOKEN%" --header "Dropbox-API-Arg: {\"path\": \"/%APPVEYOR_REPO_BRANCH%/windows_%PLATFORM%.zip\",\"mode\": \"add\",\"autorename\": false,\"mute\": false}" --header "Content-Type: application/octet-stream" --data-binary @bin.zip'
 # curl is sending only 5 bytes http://help.appveyor.com/discussions/problems/4050-curl-deploy-to-bintray-only-uploads-3-bytes
