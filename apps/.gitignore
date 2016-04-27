@@ -18,10 +18,10 @@
 !.gitignore
 
 # Visualizer
-!visualizer
-/visualizer/*/bin/*
-!/visualizer/*/bin/data/
+!myapps
+/myapps/*/bin/*
+!/myapps/*/bin/data/
 
-/visualizer/*/.cproject
-/visualizer/*/.project
-/visualizer/*/.settings/
+/myapps/*/.cproject
+/myapps/*/.project
+/myapps/*/.settings/
