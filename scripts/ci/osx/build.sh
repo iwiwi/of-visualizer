@@ -1,5 +1,5 @@
 #!/bin/bash
 set -ev
 ROOT=${TRAVIS_BUILD_DIR:-"$( cd "$(dirname "$0")/../../.." ; pwd -P )"}
-echo "**** Building oF + emptyExample - OSX Template Project ****"
-xcodebuild -configuration Release -target emptyExample -project "$ROOT/apps/visualizer/emptyExample/emptyExample.xcodeproj"
+echo "**** Building oF + visualizer - OSX Template Project ****"
+xcodebuild -configuration Release -target visualizer -project "$ROOT/apps/myapps/visualizer/visualizer.xcodeproj"

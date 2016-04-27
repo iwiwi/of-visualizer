@@ -15,6 +15,6 @@ sed -i "s/PLATFORM_OPTIMIZATION_CFLAGS_DEBUG = .*/PLATFORM_OPTIMIZATION_CFLAGS_D
 cd libs/openFrameworksCompiled/project
 make Release
 
-echo "**** Building emptyExample ****"
-cd $ROOT/apps/visualizer/emptyExample
+echo "**** Building visualizer ****"
+cd $ROOT/apps/myapps/visualizer
 make Release
