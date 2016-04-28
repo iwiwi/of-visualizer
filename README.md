@@ -2,7 +2,7 @@
 ====
 
 * libs/boost は新し目の Boost にエイヤッと置き換えた，問題が起きたら戻すべし
-
+* libs/openFrameworksCompiled/project/emscripten で --bind をコンパイルオプションに足している
 
 
 [openFrameworks](http://openframeworks.cc/)
