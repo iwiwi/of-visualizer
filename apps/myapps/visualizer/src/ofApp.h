@@ -6,9 +6,11 @@
 #include <fstream>
 using namespace std;
 
-void set_input(const string &txt);
-void set_solution(const string &txt);
-void set_solution_builtin(const string &name);
+extern string solver_command;
+extern string output_directory;
+void SetInput(const string &txt);
+// void set_solution(const string &txt);
+// void set_solution_builtin(const string &name);
 
 struct ext_event_handler;
 

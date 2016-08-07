@@ -1,47 +1,278 @@
+/*
+YUUSEN:
+TODO:
+- kakudai
+- 90do 45do
+- shinkouhoukou ni taishite ima eranderu sen no aida ni aru sen
+- emscripten
+- enter -> hint solver kidou
+
+
+
+(- entyousen matomoni? )
+
+DONE:
+- entyousen
+- susumu toki zenpou ni
+- tyokusen ka douka de iro ga kawaru
+ */
+
 #include "ofApp.h"
+#include "common.h"
 #include <boost/variant.hpp>
+
+// using namespace iwiwi;
+
+//
+// Algorithms
+//
+
+using Edge = pair<int, R>;
+using EdgeList = vector<Edge>;
+using Graph = vector<EdgeList>;
+string solver_command;
+string output_directory;
+
+namespace {
+int num_points;
+vector<P> coords;
+vector<vector<int>> regions;
+Graph adj_rational;
+vector<vector<int>> adj_irrational;
+}  // namespace
+
+inline R Sqr(R x) {
+  return x * x;
+}
+
+inline I Sqrt(I x, I &r) {
+  I s;
+  s = bm::sqrt(x, r);
+
+  for (int dif = -2; dif <= 2; ++dif) {
+    if (s + dif < 0) continue;
+    I ts = s + dif;
+    if (ts * ts == x) {
+      r = 0;
+      return ts;
+    }
+  }
+  return s;
+}
+
+bool Distance(int a, int b, R &d) {  // Returns whether rational
+  R d2 =
+      Sqr(coords[a].x - coords[b].x) +
+      Sqr(coords[a].y - coords[b].y);
+
+  // cerr << d2 << endl;
+
+  I num2 = numerator(d2), den2 = denominator(d2);
+  I num, numR, den, denR;
+  num = Sqrt(num2, numR);
+  den = Sqrt(den2, denR);
+  // cerr << num2 << " " << num << " " << numR << endl;
+  // cerr << den2 << " " << den << " " << denR << endl;
+  if (numR != 0 || denR != 0) {
+    return false;
+  } else {
+    assert(num * num == num2);
+    assert(den * den == den2);
+    // cerr << num << " " << den << endl;
+    d = R(num, den);
+    assert(d * d == d2);
+    // cerr << "Edge: " << a << "--" << b << ": " << d << " " << d2 << endl;
+
+    return true;
+  }
+}
+
+bool IsOnSegment(int end1, int end2, int mid) {
+  R a, b, c;
+  Distance(end1, mid, a);
+  Distance(end2, mid, b);
+  Distance(end1, end2, c);
+  return a + b == c;
+}
+
+void ConstructGraph() {
+  vector<pair<int, int>> edge_candidates;
+  for (const auto &f : regions) {
+    rep (i, f.size()) {
+      int a = f[i], b = f[(i + 1) % f.size()];
+      edge_candidates.emplace_back(MakePairUnordered(a, b));
+    }
+  }
+  sort(all(edge_candidates));
+  edge_candidates.erase(unique(all(edge_candidates)), edge_candidates.end());
+
+  int num_edges = 0;
+  adj_rational.resize(num_points);
+  adj_irrational.resize(num_points);
+  for (const auto &e : edge_candidates) {
+    int a, b;
+    tie(a, b) = e;
+
+    R d;
+    if (Distance(a, b, d)) {
+      ++num_edges;
+      adj_rational[a].emplace_back(b, d);
+      adj_rational[b].emplace_back(a, d);
+    } else {
+      adj_irrational[a].emplace_back(b);
+      adj_irrational[b].emplace_back(a);
+    }
+  }
+
+  cerr
+      << "All edges: " << edge_candidates.size() << endl
+      << "Rational edges: " << num_edges << endl;
+
+  // Sorting
+  rep (i, num_points) {
+    P p = coords[i];
+    auto &ord = adj_rational[i];
+    sort(all(ord), [&] (const Edge &ae, const Edge &be) -> bool {
+        int a = ae.first, b = be.first;
+        P av = coords[a], bv = coords[b];
+        av = av - p;
+        bv = bv - p;
+        int aq = Quadrant(av), bq = Quadrant(bv);
+        if (aq != bq) return aq < bq;
+        else return Det(av, bv) > 0;
+      });
+  }
+}
+
+int NextCandidate(const vector<int> &path, int crr_candidate) {
+  if (path.empty()) {  // The first point
+    do {
+      (crr_candidate += 1) %= num_points;
+    } while (adj_rational[crr_candidate].empty());
+    return crr_candidate;
+  }
+  else {
+    int pivot = path.back();
+    const auto &a = adj_rational[pivot];
+    if (crr_candidate == -1) {
+      if (path.size() >= 2) {
+        for (const auto &e : a) {
+          if (IsOnSegment(path[path.size() - 2], e.first, path[path.size() - 1])) {
+            return e.first;
+          }
+        }
+      }
+      return a[0].first;
+    } else {
+      rep (i, a.size()) {
+        if (a[i].first == crr_candidate) {
+          return a[(i + 1) % a.size()].first;
+        }
+      }
+      assert(false);
+    }
+  }
+}
+
+int PrevCandidate(const vector<int> &path, int crr_candidate) {
+  if (path.empty()) {  // The first point
+    do {
+      (crr_candidate += -1 + num_points) %= num_points;
+    } while (adj_rational[crr_candidate].empty());
+    return crr_candidate;
+  } else {
+    int pivot = path.back();
+    const auto &a = adj_rational[pivot];
+    if (crr_candidate == -1) {
+      if (path.size() >= 2) {
+        for (const auto &e : a) {
+          if (IsOnSegment(path[path.size() - 2], e.first, path[path.size() - 1])) {
+            return e.first;
+          }
+        }
+      }
+      return a[0].first;
+    } else {
+      rep (i, a.size()) {
+        if (a[i].first == crr_candidate) {
+          return a[(i - 1 + a.size()) % a.size()].first;
+        }
+      }
+      assert(false);
+    }
+  }
+}
+
+R PathDistance(const vector<int> &path) {
+  R d = 0;
+  rep (i, int(path.size()) - 1) {
+    R td;
+    Distance(path[i], path[i + 1], td);
+    d += td;
+  }
+  return d;
+}
+
+void PrintPathDistance(const vector<int> &path, ostream &os) {
+  R d = PathDistance(path);
+  if (d > 0 && denominator(d) == 1) {
+    os << "-----------------------" << endl
+       << "  I N T E G E R ! ! !  " << endl
+       << "-----------------------" << endl;
+  }
+  os << "[Distance: " << static_cast<double>(d) << " (" << d << ")]" << endl;
+}
+
+void PrintHint(const vector<int> &path, ostream &os) {
+  R d = PathDistance(path);
+  if (d == 4) {
+    os << path.size() - 1 << endl;
+    rep (i, path.size() - 1) os << path[i] << " ";
+    os << endl;
+  } else {
+    os << path.size() << endl;
+    for (int v : path) os << v << " ";
+    os << endl;
+  }
+}
+
+string PathSummary(const vector<int> &path) {
+  ostringstream os;
+  PrintPathDistance(path, os);
+  PrintHint(path, os);
+
+  return os.str();
+}
 
 //
 // External events, which are mainly assumed as user operations via javascript.
 //
 namespace ext_event {
-struct set_solution {
-  string solution;
-};
-
-struct set_input {
+struct SetInput {
   string input;
 };
 
-struct set_input_and_solution {
-  string input;
-  string solution;
-};
+struct SaveHintAndExecuteSolver {};
 
-using info = boost::variant<
-  set_solution,
-  set_input,
-  set_input_and_solution
+using Info = boost::variant<
+  SetInput,
+  SaveHintAndExecuteSolver
   >;
 
-queue<info> queue;
+queue<Info> queue;
 mutex queue_mutex;
 
-void push(info i) {
+void push(Info i) {
   lock_guard<mutex> l(queue_mutex);
   queue.push(i);
 }
 
-void push_set_solution(const string &txt) {
-  ext_event::queue.push(ext_event::set_solution{txt});
-}
-
 void push_set_input(const string &txt) {
-  ext_event::queue.push(ext_event::set_input{txt});
+  ext_event::queue.push(ext_event::SetInput{txt});
 }
 
-void push_set_input_and_solution(const string &input, const string &solution) {
-  ext_event::queue.push(ext_event::set_input_and_solution{input, solution});
+void PushSaveHintAndExecuteSolver() {
+  ext_event::queue.push(ext_event::SaveHintAndExecuteSolver());
 }
 }  // namespace ext_event
 
@@ -50,187 +281,123 @@ void push_set_input_and_solution(const string &input, const string &solution) {
 #include <emscripten/bind.h>
 
 EMSCRIPTEN_BINDINGS(my_module) {
-  emscripten::function("setSolution", &ext_event::push_set_solution);
   emscripten::function("setInput", &ext_event::push_set_input);
-  emscripten::function("setInputAndSolution", &ext_event::push_set_input_and_solution);
+  // emscripten::function("setSolution", &ext_event::push_set_solution);
+  // emscripten::function("setInputAndSolution", &ext_event::push_set_input_and_solution);
 }
 #endif
 
-//
-// Official output checker
-//
-namespace chokudai {
-int output_checker(string in_str, string out_str) {
-  const int N = 30;
-
-  try{
-    // ifstream inp(argv[1]);
-    // ifstream ans(argv[3]);
-    // ifstream out(argv[2]);
-    istringstream inp(in_str);
-    istringstream out(out_str);
-    int num[N][N] = {};
-
-    int sum = 0;
-    for (int i = 0; i < N; i++)
-    {
-      for (int j = 0; j < N; j++)
-      {
-        inp >> num[i][j];
-        sum += num[i][j];
-      }
-    }
-
-    int prey = -2;
-    int prex = -2;
-    int prenum = -1;
-
-    int cnt = 0;
-    for (int i = 0; i < sum; i++)
-    {
-      int y, x;
-      out >> y >> x;
-      y--; x--;
-      if (y < 0 || x < 0 || y >= N || x >= N) continue;
-
-      int d = abs(prey - y) + abs(prex - x);
-      if (d != 1 || prenum != num[y][x] + 1) cnt++;
-
-      prey = y;
-      prex = x;
-      prenum = num[y][x];
-      num[y][x]--;
-    }
-
-    for (int i = 0; i < N; i++)
-    {
-      for (int j = 0; j < N; j++)
-      {
-        if (num[i][j] != 0) return -1;
-      }
-    }
-
-    int point = 100000 - cnt;
-
-    // printf("IMOJUDGE<<<%d>>>\n", point);
-    //cout << "ok" << endl;
-    return point;
-  }
-  catch(char* str){
-	cerr << "error: " << str << endl;
-    return -1;
-  }
-}
-}  // namespace chokudai
 
 //
 // Global variables
 //
 namespace {
-const int N = 30;
-vector<vector<int>> A;
-string A_str;
-vector<pair<int, int>> sol;
-vector<pair<int, int>> path;
+double display_size = 800;
+P padding;
+R scale;
 
-int scale = 20;
-int step;
-}  // namespace
+vector<int> path;
+int candidate;
 
-void set_input(const string &txt) {
-  A.assign(N, vector<int>(N));
-  istringstream ss(txt);
-  for (int y = 0; y < N; ++y) {
-    for (int x = 0; x < N; ++x) {
-      if (!(ss >> A[y][x])) {
-        cerr << "Error: input too short" << endl;
-        return;
-      }
-    }
-  }
-  A_str = txt;
-  // TODO: check EOF
+string raw_problem;
 }
 
-void set_solution(const string &txt) {
-  {
-    int score = chokudai::output_checker(A_str, txt);
-    printf("Score: %d\n", score);
-    if (score < 0) return;  // Invalid solution
-  }
-  {
-    istringstream ss(txt);
-    sol.clear();
-    for (int x, y; ss >> y >> x; ) {
-      sol.emplace_back(x - 1, y - 1);
-    }
-  }
-}
 
-void move_step(int target) {
-  while (step < target && step < (int)sol.size()) {
-    --A[sol[step].second][sol[step].first];
-    ++step;
+void SetInput(const string &txt) {
+  raw_problem = txt;
+
+  // Input
+  istringstream is(txt);
+  is >> num_points;
+  coords.resize(num_points);
+  rep (i, num_points) is >> coords[i];
+  cerr << "Number of points: " << num_points << endl;
+
+  int num_regions;
+  is >> num_regions;
+  regions.resize(num_regions);
+  rep (i, num_regions) {
+    auto &f = regions[i];
+    int n;
+    is >> n;
+    f.resize(n);
+    rep (j, n) is >> f[j];
   }
-  while (step > target) {
-    --step;
-    ++A[sol[step].second][sol[step].first];
+
+  // Construct the graph
+  ConstructGraph();
+  path.clear();
+  candidate = NextCandidate(path, -1);
+
+  // Padding and scale
+  R minX, maxX, minY, maxY;
+  minX = maxX = coords[0].x;
+  minY = maxY = coords[0].y;
+  rep (i, num_points) {
+    minX = min(minX, coords[i].x); maxX = max(maxX, coords[i].x);
+    minY = min(minY, coords[i].y); maxY = max(maxY, coords[i].y);
   }
+
+  R w = max(maxX - minX, maxY - minY);
+  scale = 1 / w * 9 / 10;
+  padding = P(-minX * scale + R(1, 20) + (w - (maxX - minX)) / 2,
+              -minY * scale + R(1, 20) + (w - (maxY - minY)) / 2);
 }
 
 void ofApp::setup(){
-  if (A.empty()) {
-    ifstream ifs("data/sample_input.txt");
-    assert(ifs);
-    set_input(string((std::istreambuf_iterator<char>(ifs)),
-                     std::istreambuf_iterator<char>()));
-  }
-
   ofSetFrameRate(30);
   ofBackground(255, 255, 255);
 
   ofTrueTypeFont::setGlobalDpi(72);
   font.load("verdana.ttf", 12, true, true);
 
-  gui.setup();
-  gui.add(step_slider.setup("step", 0, 0, sol.size()));
-  gui.add(speed_slider.setup("speed", 2.0, -1, 3));
-  gui.add(history_slider.setup("history", 100, 1, 1000));
-  gui.setPosition(N * scale, 0);
+  // gui.setup();
+  // gui.add(step_slider.setup("step", 0, 0, sol.size()));
+  // gui.add(speed_slider.setup("speed", 2.0, -1, 3));
+  // gui.add(history_slider.setup("history", 100, 1, 1000));
+  // gui.setPosition(N * scale, 0);
 
-  ofSetWindowShape(N * scale + gui.getWidth(), N * scale);
-
-  step = 0;
+  ofSetWindowShape(display_size, display_size);
 }
 
+//
+// Event handlers
+//
 struct ext_event_handler : boost::static_visitor<void> {
   ext_event_handler(ofApp &app) : app_(app) {}
 
-  void operator()(ext_event::set_solution &t) const {
-    move_step(0);
-    set_solution(t.solution);
-    app_.step_slider.setMax(sol.size());
-    app_.step_slider = 0;
+  void operator()(ext_event::SetInput &t) const {
+    SetInput(t.input);
   }
 
-  void operator()(ext_event::set_input &t) const {
-    move_step(0);
-    set_input(t.input);
-    set_solution("");
-    app_.step_slider.setMax(sol.size());
-    app_.step_slider = 0;
-  }
+  void operator()(ext_event::SaveHintAndExecuteSolver&) const {
+    cout << PathSummary(path) << endl;
+    string hinted_problem_path = output_directory + "/" + to_string(getpid()) + ".hinted_problem.txt";
+    string solution_path = output_directory + "/" + to_string(getpid()) + ".solution.txt";
+    {
+      ostringstream os;
+      os << raw_problem;
+      PrintHint(path, os);
 
-  void operator()(ext_event::set_input_and_solution &t) const {
-    move_step(0);
-    set_input(t.input);
-    set_solution(t.solution);
-    app_.step_slider.setMax(sol.size());
-    app_.step_slider = 0;
+      ofBuffer buffer = ofBuffer(os.str());
+      ofBufferToFile(hinted_problem_path, buffer);
+      cerr << "Hinted problem written to: " << hinted_problem_path << endl;
+    }
+    if (solver_command.empty()) {
+      cerr << "WARNING: solver not specified" << endl;
+    } else {
+      string cmd = solver_command
+          + " < " + hinted_problem_path
+          + " > " + solution_path;
+      cerr << "Command to run: " << cmd << endl;
+      system(cmd.c_str());
+      cerr << "Solution written to: " << solution_path << endl;
+    }
   }
 
   template<typename T>
   void operator()(T &t) const {
+    CHECK(false);
     assert(false);
   }
 
@@ -243,23 +410,75 @@ void ofApp::update(){
     lock_guard<mutex> l(ext_event::queue_mutex);
 
     while (!ext_event::queue.empty()) {
-      ext_event::info i = ext_event::queue.front();
+      ext_event::Info i = ext_event::queue.front();
       ext_event::queue.pop();
       boost::apply_visitor(ext_event_handler(*this), i);
     }
   }
+}
 
-  // Proceed
-  if ((int)step_slider < (int)sol.size()) {
-    step_slider = min((float)sol.size(), step_slider + pow(10, speed_slider));
+ofPoint GetPoint(int v, const P &padding, const R &scale) {
+  return (coords[v] * scale + padding).OFPoint() * display_size;
+}
+
+void DrawLine(int v, int w, const P &padding, const R &scale) {
+  ofDrawLine(GetPoint(v, padding, scale), GetPoint(w, padding, scale));
+}
+
+void Draw(const P &padding, const R &scale) {
+  ofSetLineWidth(1);
+  ofSetColor(200, 200, 200);
+  rep (v, num_points) {
+    for (int w : adj_irrational[v]) DrawLine(v, w, padding, scale);
   }
-  move_step((int)step_slider);
+
+  ofSetColor(0, 0, 0);
+  rep (v, num_points) {
+    for (const Edge &e : adj_rational[v]) {
+      int w = e.first;
+      DrawLine(v, w, padding, scale);
+    }
+  }
+
+  ofSetColor(255, 0, 0);
+  rep (i, int(path.size()) - 1) DrawLine(path[i], path[i + 1], padding, scale);
+
+  bool is_straight = false;
+  if (!path.empty()) {
+    ofSetColor(255, 0, 0);
+    ofDrawCircle(GetPoint(path[0], padding, scale), 0.01 * display_size);
+
+
+    is_straight = path.size() >= 2 &&
+        IsOnSegment(path[path.size() - 2], candidate, path[path.size() - 1]);
+
+    if (is_straight) ofSetColor(0, 0, 150);
+    else ofSetColor(0, 150, 0);
+    ofSetLineWidth(2);
+    DrawLine(path.back(), candidate, padding, scale);
+    // Entyou sen
+    {
+      ofSetLineWidth(4);
+      if (is_straight) ofSetColor(0, 0, 150, 70);
+      else ofSetColor(0, 150, 0, 70);
+      ofPoint a = GetPoint(path.back(), padding, scale);
+      ofPoint b = GetPoint(candidate, padding, scale);
+      ofDrawLine(a, a + (b - a) * display_size * 100);
+    }
+    ofSetLineWidth(1);
+  }
+
+  if (is_straight) ofSetColor(0, 0, 150);
+  else ofSetColor(0, 150, 0);
+  ofDrawCircle(GetPoint(candidate, padding, scale), 0.01 * display_size);
 }
 
 void ofApp::draw(){
   ofSetColor(0, 0, 0);
 
-  ofSetLineWidth(1);
+  Draw(padding, scale);
+
+  /*
   for (int y = 0; y <= N; ++y) ofDrawLine(0, y * scale, N * scale, y * scale);
   for (int x = 0; x <= N; ++x) ofDrawLine(x * scale, 0, x * scale, N * scale);
 
@@ -272,40 +491,67 @@ void ofApp::draw(){
     }
   }
 
-  for (int i = 0; i < history_slider; ++i) {
-    int s = step - 1 - i;
-    if (s < 0) break;
-    int x = sol[s].first, y = sol[s].second;
-
-    ofSetColor(0, 0, 0, 255 * (history_slider - i) / history_slider);
-    ofDrawCircle((x + 0.5) * scale, (y + 0.5) * scale, 3);
-
-    if (s > 1) {
-      int tx = sol[s - 1].first, ty = sol[s - 1].second;
-      if (abs(tx - x) + abs(ty - y) == 1 && A[ty][tx] == A[y][x] + 1) {
-        ofVec2f p1((x + 0.5) * scale, (y + 0.5) * scale);
-        ofVec2f p2((tx + 0.5) * scale, (ty + 0.5) * scale);
-        ofVec2f pm = (p1 + p2) / 2.0;
-        ofVec2f v = p1 - p2;
-
-        ofSetLineWidth(max(1, scale / 10));
-        ofDrawLine(p1, p2);
-        ofDrawLine(pm, pm + v.getRotated(135) * 0.3);
-        ofDrawLine(pm, pm + v.getRotated(-135) * 0.3);
-      }
-    }
-  }
-
   gui.draw();
+  */
 }
 
 void ofApp::windowResized(int w, int h){
-  scale = min((int)((w - gui.getWidth()) / N), h / N);
-  gui.setPosition(N * scale, 0);
-  font.load("verdana.ttf", scale / 2, true, true);
+  display_size = min(w, h);
+  //  scale = min((int)((w - gui.getWidth()) / N), h / N);
+  // gui.setPosition(N * scale, 0);
+  font.load("verdana.ttf", display_size / 2, true, true);
 }
 
-void ofApp::keyPressed(int key){}
+void ofApp::keyPressed(int key) {
+  // Starting point selection mode
+  switch (key) {
+    case OF_KEY_RIGHT:
+      if (path.empty()) {
+        candidate = NextCandidate(path, candidate);
+      } else {
+        candidate = NextCandidate(path, candidate);
+      }
+      break;
+
+    case OF_KEY_LEFT:
+      if (path.empty()) {
+        candidate = PrevCandidate(path, candidate);
+      } else {
+        candidate = PrevCandidate(path, candidate);
+      }
+      break;
+
+    case ' ':
+      path.emplace_back(candidate);
+      cout << PathSummary(path) << endl;
+
+      candidate = NextCandidate(path, -1);
+      break;
+
+    case OF_KEY_RETURN:
+      ext_event::PushSaveHintAndExecuteSolver();
+      return;
+
+    case OF_KEY_BACKSPACE:
+      if (!path.empty()) {
+        candidate = path.back();
+        path.pop_back();
+
+        cout << PathSummary(path) << endl;
+      }
+      break;
+
+    default:
+      return;
+  }
+
+  {
+    vector<int> tmp(path);
+    tmp.emplace_back(candidate);
+    PrintPathDistance(tmp, cerr);
+  }
+}
+
 void ofApp::keyReleased(int key){}
 void ofApp::mouseMoved(int x, int y){}
 void ofApp::mouseDragged(int x, int y, int button){}
