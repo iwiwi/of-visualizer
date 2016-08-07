@@ -21,6 +21,8 @@ DONE:
 #include "common.h"
 #include <boost/variant.hpp>
 
+const double kDefaultDisplaySize = 500;
+
 // using namespace iwiwi;
 
 //
@@ -292,9 +294,7 @@ EMSCRIPTEN_BINDINGS(my_module) {
 // Global variables
 //
 namespace {
-double display_size = 800;
-P padding;
-R scale;
+double display_size = kDefaultDisplaySize;
 
 vector<int> path;
 int candidate;
@@ -328,20 +328,6 @@ void SetInput(const string &txt) {
   ConstructGraph();
   path.clear();
   candidate = NextCandidate(path, -1);
-
-  // Padding and scale
-  R minX, maxX, minY, maxY;
-  minX = maxX = coords[0].x;
-  minY = maxY = coords[0].y;
-  rep (i, num_points) {
-    minX = min(minX, coords[i].x); maxX = max(maxX, coords[i].x);
-    minY = min(minY, coords[i].y); maxY = max(maxY, coords[i].y);
-  }
-
-  R w = max(maxX - minX, maxY - minY);
-  scale = 1 / w * 9 / 10;
-  padding = P(-minX * scale + R(1, 20) + (w - (maxX - minX)) / 2,
-              -minY * scale + R(1, 20) + (w - (maxY - minY)) / 2);
 }
 
 void ofApp::setup(){
@@ -357,7 +343,7 @@ void ofApp::setup(){
   // gui.add(history_slider.setup("history", 100, 1, 1000));
   // gui.setPosition(N * scale, 0);
 
-  ofSetWindowShape(display_size, display_size);
+  ofSetWindowShape(display_size * 2, display_size);
 }
 
 //
@@ -421,30 +407,59 @@ ofPoint GetPoint(int v, const P &padding, const R &scale) {
   return (coords[v] * scale + padding).OFPoint() * display_size;
 }
 
-void DrawLine(int v, int w, const P &padding, const R &scale) {
-  ofDrawLine(GetPoint(v, padding, scale), GetPoint(w, padding, scale));
+void DrawLine(ofPoint p1, ofPoint p2, const ofRectangle &clip) {
+  if (!clip.inside(p1)) swap(p1, p2);
+  if (!clip.inside(p1)) return;
+
+  if (!clip.inside(p2)) {
+    ofVec2f v = p2 - p1;
+    double l = 0.0, r = 1.0;
+    rep (iter, 100) {
+      double m = (l + r) / 2;
+      if (clip.inside(p1 + v * m)) l = m;
+      else r = m;
+    }
+    p2 = p1 + v * (l + r) / 2;
+  }
+
+  ofDrawLine(p1, p2);
 }
 
-void Draw(const P &padding, const R &scale) {
+void DrawLine(int v, int w, const P &padding, const R &scale,
+              const ofRectangle &clip) {
+  ofPoint p1 = GetPoint(v, padding, scale);
+  ofPoint p2 = GetPoint(w, padding, scale);
+  DrawLine(p1, p2, clip);
+}
+
+void DrawPoint(int v, const P &padding, const R &scale, const ofRectangle &clip) {
+  ofPoint p = GetPoint(v, padding, scale);
+  if (clip.inside(p)) ofDrawCircle(p, 0.01 * display_size);
+}
+
+void Draw(const P &padding, const R &scale, const ofRectangle &clip) {
   ofSetLineWidth(1);
   ofSetColor(200, 200, 200);
   rep (v, num_points) {
-    for (int w : adj_irrational[v]) DrawLine(v, w, padding, scale);
+    for (int w : adj_irrational[v]) DrawLine(v, w, padding, scale, clip);
   }
 
   ofSetColor(0, 0, 0);
   rep (v, num_points) {
     for (const Edge &e : adj_rational[v]) {
       int w = e.first;
-      DrawLine(v, w, padding, scale);
+      DrawLine(v, w, padding, scale, clip);
     }
   }
 
   ofSetColor(255, 0, 0);
-  rep (i, int(path.size()) - 1) DrawLine(path[i], path[i + 1], padding, scale);
+  rep (i, int(path.size()) - 1) DrawLine(path[i], path[i + 1], padding, scale, clip);
 
   bool is_straight = false;
   if (!path.empty()) {
+    ofSetColor(0, 0, 0);
+    ofDrawCircle(GetPoint(path.back(), padding, scale), 0.01 * display_size);
+
     ofSetColor(255, 0, 0);
     ofDrawCircle(GetPoint(path[0], padding, scale), 0.01 * display_size);
 
@@ -455,7 +470,7 @@ void Draw(const P &padding, const R &scale) {
     if (is_straight) ofSetColor(0, 0, 150);
     else ofSetColor(0, 150, 0);
     ofSetLineWidth(2);
-    DrawLine(path.back(), candidate, padding, scale);
+    DrawLine(path.back(), candidate, padding, scale, clip);
     // Entyou sen
     {
       ofSetLineWidth(4);
@@ -463,7 +478,7 @@ void Draw(const P &padding, const R &scale) {
       else ofSetColor(0, 150, 0, 70);
       ofPoint a = GetPoint(path.back(), padding, scale);
       ofPoint b = GetPoint(candidate, padding, scale);
-      ofDrawLine(a, a + (b - a) * display_size * 100);
+      DrawLine(a, a + (b - a) * display_size * 100, clip);
     }
     ofSetLineWidth(1);
   }
@@ -474,9 +489,44 @@ void Draw(const P &padding, const R &scale) {
 }
 
 void ofApp::draw(){
-  ofSetColor(0, 0, 0);
+  //
+  // Normal
+  //
+  R minX, maxX, minY, maxY;
+  minX = maxX = coords[0].x;
+  minY = maxY = coords[0].y;
+  rep (i, num_points) {
+    minX = min(minX, coords[i].x); maxX = max(maxX, coords[i].x);
+    minY = min(minY, coords[i].y); maxY = max(maxY, coords[i].y);
+  }
 
-  Draw(padding, scale);
+  R w = max(maxX - minX, maxY - minY);
+  R scale = 1 / w * 9 / 10;
+  P padding = P(-minX * scale + R(1, 20) + (w - (maxX - minX)) / 2,
+              -minY * scale + R(1, 20) + (w - (maxY - minY)) / 2);
+
+  Draw(padding, scale,
+       ofRectangle(ofPoint(0, 0), ofPoint(display_size, display_size)));
+
+
+  //
+  // Magnifier
+  //
+  {
+    int center_i = path.empty() ? candidate : path.back();
+    P center_p = coords[center_i];
+
+    R nearest_d = 1;
+    for (const auto &e : adj_rational[center_i]) nearest_d = min(nearest_d, e.second);
+
+    R scale2 = 1 / nearest_d * 1 / 5;
+    P padding2 = -1 * center_p * scale2 + P(R(1, 2), R(1, 2));
+
+    Draw(P(1, 0) + padding2, scale2,
+         ofRectangle(ofPoint(display_size, 0), ofPoint(display_size * 2, display_size)));
+  }
+
+
 
   /*
   for (int y = 0; y <= N; ++y) ofDrawLine(0, y * scale, N * scale, y * scale);
@@ -496,7 +546,7 @@ void ofApp::draw(){
 }
 
 void ofApp::windowResized(int w, int h){
-  display_size = min(w, h);
+  display_size = min(w / 2, h);
   //  scale = min((int)((w - gui.getWidth()) / N), h / N);
   // gui.setPosition(N * scale, 0);
   font.load("verdana.ttf", display_size / 2, true, true);

@@ -134,6 +134,10 @@ inline std::istream &operator>>(std::istream &is, P &p) {
   return is >> p.x >> p.y;
 };
 
+inline std::ostream &operator<<(std::ostream &os, const P &p) {
+  return os << "(" << p.x << "," << p.y << ")";
+};
+
 inline int Quadrant(const P &p) {
   assert(p.x != 0 || p.y != 0);
   if (p.y >= 0 && p.x > 0) return 0;
